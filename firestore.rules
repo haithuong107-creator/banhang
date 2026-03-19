@@ -1,0 +1,216 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string
+    //   - role: string (required, ['admin', 'sales'])
+    //   - createdAt: string (required)
+    //
+    // Collection: products
+    // Document ID: {productId}
+    // Fields:
+    //   - sku: string
+    //   - name: string (required)
+    //   - barcode: string (required)
+    //   - sellPrice: number (required)
+    //   - buyPrice: number
+    //   - taxRate: number (required, [0, 5, 8, 10])
+    //   - stock: number (required)
+    //   - minStock: number
+    //   - updatedAt: string
+    //
+    // Collection: orders
+    // Document ID: {orderId}
+    // Fields:
+    //   - items: list (required)
+    //   - subtotal: number
+    //   - vatAmount: number
+    //   - discount: number
+    //   - shippingFee: number
+    //   - totalAmount: number (required)
+    //   - finalAmount: number (required)
+    //   - amountPaid: number
+    //   - debt: number
+    //   - status: string (Pending, Completed, Cancelled)
+    //   - paymentType: string (Full, Installment, Deposit)
+    //   - sellerId: string (required)
+    //   - sellerName: string
+    //   - createdAt: string (required)
+    //
+    // Collection: customers
+    // Document ID: {phone}
+    // Fields:
+    //   - phone: string (required)
+    //   - name: string (required)
+    //   - purchaseHistory: list
+    //   - rfmScore: string
+    //
+    // Collection: vat_reports
+    // Document ID: {reportId}
+    // Fields:
+    //   - type: string (Input, Output)
+    //   - amount: number
+    //   - taxAmount: number
+    //   - taxRate: number
+    //
+    // Collection: quotations
+    // Document ID: {quotationId}
+    // Fields:
+    //   - customerName: string (required)
+    //   - customerPhone: string (required)
+    //   - items: list (required)
+    //   - totalAmount: number (required)
+    //   - status: string (Draft, Sent, Accepted, Rejected)
+    //   - sellerId: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((userExists() && getUserData().role == 'admin') || 
+         (request.auth.token.email == "haithuong107@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isSales() {
+      return isAuthenticated() && userExists() && getUserData().role == 'sales';
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && data.email.size() > 0 &&
+             data.role in ['admin', 'sales'];
+    }
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['name', 'barcode', 'sellPrice', 'stock', 'taxRate']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.barcode is string && data.barcode.size() > 0 && data.barcode.size() < 50 &&
+             data.sellPrice is number && data.sellPrice >= 0 &&
+             data.stock is number &&
+             data.taxRate in [0, 5, 8, 10];
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['items', 'totalAmount', 'finalAmount', 'sellerId', 'createdAt', 'status']) &&
+             data.items is list && data.items.size() > 0 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.finalAmount is number && data.finalAmount >= 0 &&
+             data.sellerId == request.auth.uid &&
+             data.status in ['Pending', 'Completed', 'Cancelled'];
+    }
+
+    function isValidCustomer(data) {
+      return hasRequiredFields(['phone', 'name']) &&
+             data.phone is string && data.name is string &&
+             (!('email' in data) || data.email is string) &&
+             (!('address' in data) || data.address is string) &&
+             (!('note' in data) || data.note is string);
+    }
+
+    function isValidVATReport(data) {
+      return hasRequiredFields(['type', 'amount', 'taxAmount', 'createdAt']) &&
+             data.type in ['Input', 'Output'];
+    }
+
+    function isValidQuotation(data) {
+      return hasRequiredFields(['customerName', 'customerPhone', 'items', 'totalAmount', 'status', 'sellerId', 'createdAt']) &&
+             data.customerName is string && data.customerPhone is string &&
+             data.items is list && data.items.size() > 0 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.status in ['Draft', 'Sent', 'Accepted', 'Rejected'] &&
+             data.sellerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isOwner(userId) && request.resource.data.role == 'sales' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isOwner(userId) && request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin() && isValidProduct(request.resource.data);
+      // Sales can update stock when selling
+      allow update: if isSales() && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'updatedAt']) &&
+                    isValidProduct(request.resource.data);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isSales()) && isValidOrder(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /customers/{phone} {
+      allow read: if isAuthenticated();
+      allow create, update: if (isAdmin() || isSales()) && isValidCustomer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /vat_reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isSales()) && isValidVATReport(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /quotations/{quotationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (isAdmin() || isSales()) && isValidQuotation(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

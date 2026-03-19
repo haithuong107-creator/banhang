@@ -1,0 +1,7 @@
+{
+  "name": "laptop hoàng hải",
+  "description": "Hệ thống quản lý bán hàng thông minh tích hợp AI Gemini, quét mã vạch và dự báo tồn kho.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

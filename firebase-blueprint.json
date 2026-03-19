@@ -1,0 +1,164 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Thông tin người dùng và phân quyền hệ thống",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "sales"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Thông tin sản phẩm trong kho",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "barcode": { "type": "string" },
+        "category": { "type": "string" },
+        "buyPrice": { "type": "number" },
+        "sellPrice": { "type": "number" },
+        "taxRate": { "type": "number", "enum": [0, 5, 8, 10] },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "barcode", "sellPrice", "stock", "taxRate"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Bản ghi đơn hàng chi tiết",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" },
+              "taxRate": { "type": "number" }
+            }
+          }
+        },
+        "subtotal": { "type": "number" },
+        "vatAmount": { "type": "number" },
+        "discount": { "type": "number" },
+        "shippingFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "finalAmount": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "debt": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Completed", "Cancelled"] },
+        "paymentType": { "type": "string", "enum": ["Full", "Installment", "Deposit"] },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["items", "totalAmount", "finalAmount", "sellerId", "status", "createdAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Quản lý khách hàng CRM",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string" },
+        "name": { "type": "string" },
+        "purchaseHistory": { "type": "array", "items": { "type": "string" } },
+        "rfmScore": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "name"]
+    },
+    "VATReport": {
+      "title": "VATReport",
+      "description": "Báo cáo chi tiết thuế",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["Input", "Output"] },
+        "amount": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "taxRate": { "type": "number" },
+        "referenceId": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "amount", "taxAmount", "createdAt"]
+    },
+    "Quotation": {
+      "title": "Quotation",
+      "description": "Báo giá cho khách hàng",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" },
+              "taxRate": { "type": "number" }
+            }
+          }
+        },
+        "subtotal": { "type": "number" },
+        "vatAmount": { "type": "number" },
+        "discount": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Sent", "Accepted", "Rejected"] },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "customerPhone", "items", "totalAmount", "status", "sellerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Thông tin chi tiết người dùng"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Danh sách sản phẩm"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Lịch sử đơn hàng"
+    },
+    "/customers/{phone}": {
+      "schema": "Customer",
+      "description": "Dữ liệu khách hàng"
+    },
+    "/vat_reports/{reportId}": {
+      "schema": "VATReport",
+      "description": "Báo cáo thuế"
+    },
+    "/quotations/{quotationId}": {
+      "schema": "Quotation",
+      "description": "Danh sách báo giá"
+    }
+  }
+}
